@@ -3,30 +3,36 @@ import re
 #Import("env")
 
 def build_page():
-	origin = "./web/"
+	origin = "./web/src/"
+	extras = "extras.h"
+	ignore = ["package.json", "package-lock.json", "node_modules","tailwind.config.js", "style.css"]
 	result = "./src/auto.h"
+
 	list = listdir(origin)
+	# "FILENAME": {length: "length", data: "data"}
 	pages = {}
 
 	for file in list:
-		with open(origin+file, "r") as f:
-			name = re.sub("[^A-Z]", "_", file.upper())
-			pages[name] = f.read()
-
-	print(pages)
+		name = re.sub("[^A-Z]", "_", file.upper())
+		if file == extras:
+			with open(origin+file, "r") as f:
+				page_extras = f.read()
+				f.close()
+		elif any(ignored in file for ignored in ignore):
+			continue
+		else:
+			with open(origin+file, "rb") as f:
+				data = f.read()
+				pages[name] = {}
+				pages[name]["length"] = len(data)
+				pages[name]["data"] = "0x" + data.hex("_").replace("_", ",0x")
+				f.close()
 
 	with open(result, "w+") as f:
-		f.write("// !!! WARNING: AUTO GENERATED FILE. DO NOT MODIFY!\n\n")
-		f.write("#include <Arduino.h>\n")
-		f.write("#include <ESP8266WiFi.h>\n")
-		f.write("#include <config.h>\n")
-		f.write("static const char* ssid = WIFI_SSID;\n")
-		f.write("static const char* password = WIFI_PASS;\n")
-		f.write("static const IPAddress localIP(WIFI_LOCALIP);\n")
-		f.write("static const IPAddress gateway(WIFI_GATEWAY);\n")
-		f.write("static const IPAddress subnet(WIFI_SUBNET);\n")
-		f.write("static const IPAddress primaryDNS(WIFI_PRIMARYDNS);\n")
-		f.write("static const IPAddress secondaryDNS(WIFI_SECONDARYDNS);\n")
+		f.write("// !!! WARNING: AUTO-GENERATED FILE!\n// !!! PLEASE DO NOT MODIFY IT AND USE \"prebuild.py\"\n//\n\n")
+		f.write(page_extras+"\n")
 		for name, page in pages.items():
-			f.write(f"static const char {name}[] PROGMEM = R\"cpprawliteralstr({page})cpprawliteralstr\";\n")
+			f.write(f"static const size_t {'LEN_' + name} = {page['length']};\n")
+			f.write(f"static const uint8_t {name}[] PROGMEM = {{{page['data']}}};\n")
+
 build_page()
